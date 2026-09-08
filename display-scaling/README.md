@@ -15,6 +15,17 @@ present controls at the same physical size, without forcing a custom modeline
 into SDDM/Xorg (which was tried and did not hold — see
 [main README, "Removed experiments"](../README.md)).
 
+### Supersedes an earlier fractional-scaling approach
+
+A "TUXEDO Persistent Fixes" handoff (2026-09-08) described a different scheme:
+`~/.local/bin/fix-budgie-scale` running `wlr-randr --output eDP-1 --scale 1.2`,
+re-triggered by a `swayidle` `after-resume` / `unlock` hook in the labwc
+autostart, plus SDDM `General/scale=1.5`. Checked against the live machine that
+day: **none of it is present** — no `fix-budgie-scale` script, no `swayidle`
+scale hook, session scale is `1.0` (not `1.2`), SDDM scale is `1.25` (not
+`1.5`). This component (kanshi holding `eDP-1` at `2304x1440@90` scale `1.0`) is
+the approach actually in use. See [`../docs/manifest.md`](../docs/manifest.md).
+
 ## Why kanshi
 
 The labwc session does not reliably keep `eDP-1` at `2304x1440@90` across login,
