@@ -1,0 +1,17 @@
+#!/bin/sh
+
+for vendor in /sys/bus/pci/devices/*/vendor; do
+    [ -r "$vendor" ] || continue
+
+    dev="${vendor%/vendor}"
+
+    if [ "$(cat "$vendor")" = "0x10de" ] &&
+       [ -r "$dev/class" ] &&
+       grep -q '^0x03' "$dev/class"; then
+        echo nvidia
+        exit 0
+    fi
+done
+
+echo none
+exit 0
