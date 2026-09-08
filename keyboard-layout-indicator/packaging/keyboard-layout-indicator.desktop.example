@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Keyboard Layout Indicator
+Comment=Show current keyboard layout in the Budgie panel
+# Replace @EXEC@ with the absolute path to the installed program, e.g.
+#   /home/<you>/.local/bin/keyboard-layout-indicator
+# The program's shebang is #!/usr/bin/python3, so the system Python is used.
+# If your login shell activates Conda and you get import errors at login,
+# use instead:  Exec=/usr/bin/python3 @EXEC@
+Exec=@EXEC@
+Terminal=false
+X-GNOME-Autostart-enabled=true

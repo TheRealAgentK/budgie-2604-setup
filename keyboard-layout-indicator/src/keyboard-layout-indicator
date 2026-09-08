@@ -1,0 +1,103 @@
+#!/usr/bin/python3
+
+import os
+import subprocess
+import threading
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("AyatanaAppIndicator3", "0.1")
+
+from gi.repository import Gtk, GLib
+from gi.repository import AyatanaAppIndicator3 as AppIndicator3
+
+
+ICON_DIR = os.path.expanduser(
+    "~/.local/share/keyboard-layout-indicator/icons"
+)
+
+# Map XKB layout names reported by xkb-monitor to our icons.
+LAYOUTS = {
+    "us": ("kbd-en", "English"),
+    "gb": ("kbd-en", "English"),
+    "au": ("kbd-en", "English"),
+    "nz": ("kbd-en", "English"),
+    "de": ("kbd-de", "German"),
+}
+
+
+indicator = AppIndicator3.Indicator.new(
+    "keyboard-layout-indicator",
+    "kbd-en",
+    AppIndicator3.IndicatorCategory.SYSTEM_SERVICES,
+)
+
+indicator.set_icon_theme_path(ICON_DIR)
+indicator.set_status(AppIndicator3.IndicatorStatus.ACTIVE)
+
+
+# AppIndicators require a menu.
+menu = Gtk.Menu()
+
+layout_item = Gtk.MenuItem(label="Keyboard layout")
+layout_item.set_sensitive(False)
+menu.append(layout_item)
+
+menu.append(Gtk.SeparatorMenuItem())
+
+quit_item = Gtk.MenuItem(label="Quit")
+quit_item.connect("activate", lambda _: Gtk.main_quit())
+menu.append(quit_item)
+
+menu.show_all()
+indicator.set_menu(menu)
+
+
+def update_layout(layout):
+    layout = layout.strip().lower()
+
+    if not layout:
+        return False
+
+    icon, description = LAYOUTS.get(
+        layout,
+        ("kbd-en", layout.upper())
+    )
+
+    indicator.set_icon_full(icon, description)
+    layout_item.set_label(f"Keyboard layout: {description}")
+
+    return False
+
+
+def monitor_layout():
+    while True:
+        try:
+            process = subprocess.Popen(
+                ["/usr/local/bin/xkb-monitor", "-n"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1,
+            )
+
+            for line in process.stdout:
+                GLib.idle_add(update_layout, line)
+
+            process.wait()
+
+        except Exception as e:
+            print(f"xkb-monitor error: {e}")
+
+        # Restart if xkb-monitor unexpectedly exits.
+        GLib.usleep(1_000_000)
+
+
+thread = threading.Thread(
+    target=monitor_layout,
+    daemon=True
+)
+thread.start()
+
+Gtk.main()
