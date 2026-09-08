@@ -1,0 +1,43 @@
+#!/bin/bash
+# Wrapper for gufw (Firewall Configuration).
+#
+# gufw runs its whole GUI as root via pkexec. On this Wayland session Xwayland
+# only lets processes with our own UID connect, so the root process cannot open
+# the display and the app dies silently after authentication.
+#
+# Fix: grant local root access to the X display ONLY for as long as gufw runs,
+# then revoke it. Nothing persists between launches, unlike a permanent
+# `xhost +SI:localuser:root` in autostart.
+#
+# Residual tradeoff: `xhost +SI:localuser:root` cannot be scoped to a single
+# process, so while the firewall window is open ANY process running as root can
+# connect to the X display (read keystrokes, capture the screen, inject input).
+# That exposure is inherent to gufw drawing its GUI as root and lasts only for
+# the lifetime of the window. What this wrapper removes is the *permanent*
+# grant: outside that window there is no root X access and nothing is left in
+# autostart. To eliminate the exposure entirely, use the `ufw` CLI
+# (`sudo ufw ...`) or switch to firewalld + firewall-config instead.
+
+set -u
+
+c_user=$(whoami)
+export DISPLAY="${DISPLAY:-:1}"
+
+added_root=0
+cleanup() {
+    if [ "$added_root" = 1 ]; then
+        xhost -SI:localuser:root >/dev/null 2>&1
+    fi
+}
+trap cleanup EXIT INT TERM HUP
+
+if command -v xhost >/dev/null 2>&1; then
+    # Only touch the ACL if root isn't already allowed (respect a deliberate grant).
+    if ! xhost 2>/dev/null | grep -qx 'SI:localuser:root'; then
+        if xhost +SI:localuser:root >/dev/null 2>&1; then
+            added_root=1
+        fi
+    fi
+fi
+
+pkexec "$(command -v gufw-pkexec)" "$c_user"
