@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Nextcloud
+GenericName=File Synchronizer
+Exec=env QT_QPA_PLATFORM=xcb "/opt/Nextcloud-34.0.1-x86_64.AppImage" --background
+Terminal=false
+Icon=Nextcloud
+Categories=Network
+Type=Application
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=10
