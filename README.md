@@ -28,6 +28,8 @@ read-only `verify.sh` and document install steps without running them. See
 | [`hibernate-polkit/`](hibernate-polkit/) | Native PolicyKit JS rule restoring **Hibernate** in the Budgie UI (legacy `.pkla` no longer honoured). Capture. Swap/resume config is context only — never touch `/swapfile`. |
 | [`inotify-watches/`](inotify-watches/) | `fs.inotify.max_user_watches = 1000000` sysctl drop-in. Capture. |
 | [`nextcloud-xcb-wayland/`](nextcloud-xcb-wayland/) | Runs the **Nextcloud** AppImage (xcb-only Qt) under the Wayland session by forcing `QT_QPA_PLATFORM=xcb` for that app alone. Wrapper + reference autostart entry. |
+| [`resume-display-on/`](resume-display-on/) | Turns the panel back on after **suspend/resume**. Budgie's idle `swayidle` switches outputs off at 5 min and only re-enables them on idle activity, so waking from the battery idle-suspend left a black screen. Adds an `after-resume` listener, respawned after `budgie-daemon`'s `killall swayidle`, via a marked labwc autostart block. |
+| [`swayidle-lock-guard/`](swayidle-lock-guard/) | Restores the **lock screen and fast suspend** when Budgie's `swayidle` stops handling suspend. Each suspend then waited 30 s for its stale inhibitor and woke unlocked. It watches logind's journal for that inhibitor timeout, locks the screen, and restarts that `swayidle` with its own arguments. Marked labwc autostart block. |
 
 They are independent; install any subset.
 

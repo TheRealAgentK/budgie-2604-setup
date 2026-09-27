@@ -15,6 +15,8 @@ from this repo is a documented, manual, opt-in step. Verified read-only on
 | `~/.config/autostart/Nextcloud.desktop` | `nextcloud-xcb-wayland/reference/Nextcloud.desktop` | XDG autostart entry (`kai:kai 0664`) | **current** — verbatim reference copy |
 | Nextcloud XCB workaround (inline `env` in the `Exec=` above) | `nextcloud-xcb-wayland/scripts/nextcloud-xcb` | exec shell wrapper | repo representation only — **not installed** on the live machine |
 | labwc autostart (`~/.config/budgie-desktop/labwc/autostart`) + `~/.config/kanshi/config` | `display-scaling/` | config + scripts | **current** — see that component |
+| labwc autostart (`~/.config/budgie-desktop/labwc/autostart`) — `resume-display-on` block + `~/.local/bin/resume-display-on-listener` | `resume-display-on/` | managed autostart block + respawn-loop script | **current** — installed 2026-09-13; respawn loop added 2026-09-27 |
+| labwc autostart — `swayidle-lock-guard` block + `~/.local/bin/swayidle-lock-guard` | `swayidle-lock-guard/` | managed autostart block + journal-watching script | **current** — installed 2026-09-27; recovery path dry-run tested, not yet seen live |
 | slickSDDM `General/scale` | `display-scaling/` (documented) + `docs/sddm-scaling.md` | tool-managed setting | **current value `1.25`** |
 
 ## Not captured — superseded / out of scope
