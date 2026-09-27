@@ -1,0 +1,20 @@
+#!/bin/sh
+# Keep a minimal swayidle running that turns the outputs back on after every
+# suspend/resume. Started from the labwc autostart (resume-display-on block).
+#
+# budgie-daemon runs "killall swayidle" when it starts and whenever it
+# reconfigures idle handling, which takes this listener down with Budgie's own
+# instance. So run it in a loop and respawn it, for as long as the Wayland
+# session this was started in exists.
+
+sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY:-wayland-0}"
+
+# One loop per session.
+lock="${XDG_RUNTIME_DIR:-/tmp}/resume-display-on-listener.lock"
+exec 9>"$lock"
+flock -n 9 || exit 0
+
+while [ -S "$sock" ]; do
+    swayidle after-resume 'wlopm --on \*' 9>&-
+    sleep 2
+done
