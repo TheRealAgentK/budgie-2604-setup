@@ -1,0 +1,118 @@
+#!/bin/bash
+# charge-guard - watch the battery and warn when it passes a charge limit.
+#
+# This machine's EC firmware has NO charge-limit logic (see README.md), so no
+# software can stop the charger. This tells you when to unplug. If you own a
+# switchable plug, AT_LIMIT_CMD / BELOW_RESUME_CMD turn that into a real cutoff.
+#
+#   charge-guard             run in the foreground (what the user unit does)
+#   charge-guard --once      evaluate once, print state, exit
+#   charge-guard --test      send a test notification and exit
+set -u
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/budgie-2604-setup/charge-guard.conf"
+
+# Defaults; the config file overrides them.
+LIMIT=80              # warn at or above this percentage while a charger is connected
+RESUME=75             # consider the episode over below this
+POLL=30               # seconds between checks
+REPEAT_MIN=10         # re-warn every N minutes while still over the limit
+NOTIFY=1              # 0 disables desktop notifications
+AT_LIMIT_CMD=""       # e.g. smart-plug off
+BELOW_RESUME_CMD=""   # e.g. smart-plug on
+# shellcheck source=/dev/null
+[ -r "$CONF" ] && . "$CONF"
+
+for v in LIMIT RESUME POLL REPEAT_MIN; do
+	case "${!v}" in
+		''|*[!0-9]*) echo "charge-guard: $v='${!v}' in $CONF is not a whole number" >&2; exit 1 ;;
+	esac
+done
+[ "$RESUME" -lt "$LIMIT" ] || { echo "charge-guard: RESUME ($RESUME) must be below LIMIT ($LIMIT)" >&2; exit 1; }
+[ "$POLL" -gt 0 ] || { echo "charge-guard: POLL must be at least 1" >&2; exit 1; }
+
+# The battery, plus every supply that can charge it: the barrel jack (Mains)
+# and the USB-C ports (USB, via UCSI).
+BAT="" SUPPLIES=""
+for d in /sys/class/power_supply/*; do
+	case "$(cat "$d/type" 2>/dev/null)" in
+		Battery)  [ -z "$BAT" ] && BAT="$d" ;;
+		Mains|USB) SUPPLIES="$SUPPLIES $d" ;;
+	esac
+done
+[ -n "$BAT" ] || { echo "charge-guard: no battery found" >&2; exit 1; }
+
+rd() { cat "$1" 2>/dev/null || echo ""; }
+
+# 1 if a charger is connected. Any supply reporting online counts; so does the
+# battery reporting anything but Discharging, in case a USB-C charger does not
+# show up as an online supply.
+on_power() {
+	local d
+	for d in $SUPPLIES; do
+		[ "$(rd "$d/online")" = 1 ] && { echo 1; return; }
+	done
+	case "$(rd "$BAT/status")" in
+		Charging|Full|"Not charging") echo 1 ;;
+		*) echo 0 ;;
+	esac
+}
+log() { printf '%s\n' "$*"; }   # stdout; the journal adds the timestamp
+
+notify() {
+	[ "$NOTIFY" = 1 ] || return 0
+	command -v notify-send >/dev/null 2>&1 || return 0
+	# Replace our own previous notification rather than stacking a new one.
+	notify-send -a "Charge guard" -u "${2:-critical}" \
+		-h string:x-canonical-private-synchronous:charge-guard \
+		-i battery-caution "$1" "${3:-}"
+}
+
+run_hook() {
+	[ -n "$1" ] || return 0
+	log "running hook: $1"
+	if ! sh -c "$1"; then log "hook failed (exit $?)"; fi
+}
+
+state_line() {
+	cap=$(rd "$BAT/capacity"); status=$(rd "$BAT/status")
+	ac=$(on_power)
+	printf 'battery %s%% %s | on power %s | limit %s resume %s\n' "$cap" "$status" "$ac" "$LIMIT" "$RESUME"
+}
+
+case "${1-}" in
+	--once)  state_line; exit 0 ;;
+	--test)  notify "Charge guard test" normal "Notifications are working."; echo "test notification sent"; exit 0 ;;
+	--help|-h) sed -n '2,12p' "$0"; exit 0 ;;
+esac
+
+log "watching $BAT (limit ${LIMIT}%, resume ${RESUME}%, poll ${POLL}s)"
+over=0          # currently in an over-limit episode
+last_warn=0
+
+while :; do
+	cap=$(rd "$BAT/capacity")
+	ac=$(on_power)
+	now=$(date +%s)
+
+	if [ -n "$cap" ] && [ "$ac" = "1" ] && [ "$cap" -ge "$LIMIT" ]; then
+		if [ "$over" = 0 ]; then
+			log "reached ${cap}% on power - warning"
+			notify "Battery at ${cap}% - unplug the charger" critical \
+				"This laptop cannot stop charging by itself."
+			run_hook "$AT_LIMIT_CMD"
+			over=1; last_warn=$now
+		elif [ "$REPEAT_MIN" -gt 0 ] && [ $(( now - last_warn )) -ge $(( REPEAT_MIN * 60 )) ]; then
+			log "still ${cap}% on power - re-warning"
+			notify "Still charging - battery at ${cap}%" critical "Unplug the charger."
+			last_warn=$now
+		fi
+	elif [ "$over" = 1 ] && { [ "$ac" != "1" ] || { [ -n "$cap" ] && [ "$cap" -le "$RESUME" ]; }; }; then
+		log "episode over (${cap}%, on power ${ac})"
+		notify "Charging stopped at ${cap}%" low ""
+		run_hook "$BELOW_RESUME_CMD"
+		over=0
+	fi
+
+	sleep "$POLL"
+done
