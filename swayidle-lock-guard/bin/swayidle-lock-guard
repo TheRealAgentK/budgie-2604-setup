@@ -1,0 +1,102 @@
+#!/bin/bash
+# Recover Budgie's swayidle when it stops handling suspend.
+#
+# Budgie's swayidle (started by budgie-daemon) holds a logind "delay" sleep
+# inhibitor and runs "before-sleep swaylock ..." when logind announces a
+# suspend, then releases the inhibitor. Occasionally it stops reacting to
+# logind's PrepareForSleep signal while keeping the inhibitor. Every suspend
+# after that waits the full 30 s InhibitDelayMaxSec and then goes ahead
+# WITHOUT locking the screen, and logind logs:
+#
+#   Delay lock is active (UID 1000/kai, PID 4740/swayidle) but inhibitor timeout is reached.
+#
+# This follows logind's journal for that line. When the PID named is a
+# swayidle with a before-sleep command, it:
+#   1. runs that before-sleep command (the lock screen) if it is not running
+#   2. restarts that swayidle with exactly the same arguments
+#
+# Started from the labwc autostart (swayidle-lock-guard block). Exits when the
+# Wayland session it was started in goes away.
+#
+#   swayidle-lock-guard           follow the journal (normal use)
+#   swayidle-lock-guard --stdin   read log lines from stdin instead (testing);
+#                                 set SWAYIDLE_LOCK_GUARD_DRYRUN=1 to only print
+set -u
+
+TAG=swayidle-lock-guard
+DRYRUN=${SWAYIDLE_LOCK_GUARD_DRYRUN:-0}
+RE='^Delay lock is active \(UID [0-9]+/[^,]*, PID ([0-9]+)/swayidle\) but inhibitor timeout is reached'
+
+log() {
+    if [ "$DRYRUN" = 1 ]; then printf '%s: %s\n' "$TAG" "$*" >&2
+    else printf '%s\n' "$*" | systemd-cat -t "$TAG"; fi
+}
+
+run() {
+    if [ "$DRYRUN" = 1 ]; then log "would run: $*"; else "$@" 9>&-; fi
+}
+
+recover() {
+    local pid=$1 i lockcmd="" lockbin
+    local -a argv
+
+    [ -r "/proc/$pid/cmdline" ] || { log "swayidle $pid already gone"; return; }
+    [ "$(stat -c %u "/proc/$pid")" = "$(id -u)" ] || return
+    mapfile -d '' argv < "/proc/$pid/cmdline"
+    [ "${argv[0]##*/}" = swayidle ] || return
+    for ((i = 1; i < ${#argv[@]}; i++)); do
+        [ "${argv[i]}" = before-sleep ] && lockcmd=${argv[i + 1]-}
+    done
+    # Only Budgie's instance locks; leave other swayidles (e.g. resume-display-on) alone.
+    [ -n "$lockcmd" ] || return
+
+    log "swayidle $pid ignored the suspend (inhibitor timeout); locking and restarting it"
+
+    # 1. lock now - the system is about to suspend without a lock screen
+    lockbin=${lockcmd%% *}
+    if pgrep -u "$(id -u)" -x "${lockbin##*/}" >/dev/null; then
+        log "${lockbin##*/} already running"
+    else
+        run setsid -f sh -c 'exec "$@" </dev/null >/dev/null 2>&1' _ sh -c "$lockcmd"
+    fi
+
+    # 2. restart swayidle with the same arguments
+    run kill "$pid"
+    for ((i = 0; i < 20; i++)); do
+        [ "$DRYRUN" = 1 ] || kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    run setsid -f sh -c 'exec "$@" </dev/null 2>&1 | systemd-cat -t budgie-swayidle' _ "${argv[@]}"
+    log "swayidle restarted"
+}
+
+handle_line() {
+    [[ $1 =~ $RE ]] && recover "${BASH_REMATCH[1]}"
+}
+
+if [ "${1-}" = --stdin ]; then
+    while IFS= read -r line; do handle_line "$line"; done
+    exit 0
+fi
+
+sock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/${WAYLAND_DISPLAY:-wayland-0}"
+
+# One guard per session.
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/$TAG.lock"
+flock -n 9 || exit 0
+
+log "watching logind for stuck swayidle (session $sock)"
+while [ -S "$sock" ]; do
+    coproc JF { exec journalctl --follow --lines=0 --output=cat -t systemd-logind 9>&- 2>/dev/null; }
+    while [ -S "$sock" ]; do
+        IFS= read -r -t 60 line <&"${JF[0]}"
+        rc=$?
+        if [ "$rc" = 0 ]; then handle_line "$line"
+        elif [ "$rc" -gt 128 ]; then continue   # timeout: re-check the session
+        else break; fi                          # journalctl exited: restart it
+    done
+    kill "$JF_PID" 2>/dev/null
+    wait "$JF_PID" 2>/dev/null
+    [ -S "$sock" ] && sleep 5
+done
+log "Wayland session gone; exiting"
