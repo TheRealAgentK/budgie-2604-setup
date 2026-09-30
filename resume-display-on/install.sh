@@ -34,6 +34,7 @@ $END"
 
 CHECK=0
 [ "${1-}" = "--check" ] && CHECK=1
+bin_changed=0
 
 say() { printf '  %s\n' "$*"; }
 
@@ -58,6 +59,7 @@ else
     [ -f "$bin_dst" ] && cp "$bin_dst" "$bin_dst.bak-$TS"
     install -m 0755 "$bin_src" "$bin_dst"
     say "installed"
+    bin_changed=1
 fi
 
 # --- 2. labwc autostart managed block ----------------------------------------
@@ -96,7 +98,14 @@ fi
 # --- 3. listener loop for the current session -------------------------------
 echo "[3/3] after-resume listener"
 loop=$(pgrep -u "$(id -u)" -f "^/bin/sh $bin_dst" | head -1 || true)
-if [ -n "$loop" ]; then
+if [ -n "$loop" ] && [ "$bin_changed" = 1 ] && [ -n "${WAYLAND_DISPLAY-}" ]; then
+    # the running loop is the old script: replace it and its listener
+    pkill -u "$(id -u)" -f "^/bin/sh $bin_dst" || true
+    pkill -u "$(id -u)" -f "^swayidle after-resume" || true
+    sleep 0.5
+    setsid -f "$bin_dst" </dev/null >/dev/null 2>&1
+    say "respawn loop restarted with the updated script"
+elif [ -n "$loop" ]; then
     say "respawn loop already running (pid $loop)"
 elif [ "$CHECK" = 1 ]; then
     say "WOULD start the respawn loop for this session"

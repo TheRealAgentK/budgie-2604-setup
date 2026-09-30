@@ -15,6 +15,7 @@ exec 9>"$lock"
 flock -n 9 || exit 0
 
 while [ -S "$sock" ]; do
+    hash -r   # re-resolve swayidle on PATH each time (swayidle-dbus-fix)
     swayidle after-resume 'wlopm --on \*' 9>&-
     sleep 2
 done

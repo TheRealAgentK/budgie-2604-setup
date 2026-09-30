@@ -48,7 +48,10 @@ reconfigures idle handling. That kills this listener too. The first version
 started it bare from the autostart. On 2026-09-27 it turned out not to be
 running at all: it had been killed at login.
 `~/.local/bin/resume-display-on-listener` therefore runs it in a respawn loop
-(2 s delay). The loop runs once per session (`flock`) and ends when the Wayland
+(2 s delay). Before each start it runs `hash -r`, so a newly installed
+`~/.local/bin/swayidle` from `swayidle-dbus-fix` is picked up. `install.sh`
+replaces a running loop when the script changes. The loop runs once per session
+(`flock`) and ends when the Wayland
 socket it started with is gone.
 
 ## Install / remove
