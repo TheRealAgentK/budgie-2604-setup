@@ -10,10 +10,14 @@
 #
 #   Delay lock is active (UID 1000/kai, PID 4740/swayidle) but inhibitor timeout is reached.
 #
-# This follows logind's journal for that line. When the PID named is a
-# swayidle with a before-sleep command, it:
-#   1. runs that before-sleep command (the lock screen) if it is not running
-#   2. restarts that swayidle with exactly the same arguments
+# The root cause is fixed by swayidle-dbus-fix; this is the safety net.
+#
+# This follows logind's journal for that line. When the PID named is one of
+# this user's swayidle processes, it:
+#   1. runs its before-sleep command (the lock screen), if it has one and that
+#      is not already running
+#   2. restarts it: the resume-display-on listener is only killed (its loop
+#      respawns it); any other is started again with the same arguments
 #
 # Started from the labwc autostart (swayidle-lock-guard block). Exits when the
 # Wayland session it was started in goes away.
@@ -37,7 +41,7 @@ run() {
 }
 
 recover() {
-    local pid=$1 i lockcmd="" lockbin
+    local pid=$1 i lockcmd="" lockbin parent
     local -a argv
 
     [ -r "/proc/$pid/cmdline" ] || { log "swayidle $pid already gone"; return; }
@@ -47,21 +51,28 @@ recover() {
     for ((i = 1; i < ${#argv[@]}; i++)); do
         [ "${argv[i]}" = before-sleep ] && lockcmd=${argv[i + 1]-}
     done
-    # Only Budgie's instance locks; leave other swayidles (e.g. resume-display-on) alone.
-    [ -n "$lockcmd" ] || return
+    parent=$(tr '\0' ' ' < "/proc/$(ps -o ppid= -p "$pid" | tr -d ' ')/cmdline" 2>/dev/null)
 
-    log "swayidle $pid ignored the suspend (inhibitor timeout); locking and restarting it"
+    log "swayidle $pid ignored the suspend (inhibitor timeout); recovering it"
 
-    # 1. lock now - the system is about to suspend without a lock screen
-    lockbin=${lockcmd%% *}
-    if pgrep -u "$(id -u)" -x "${lockbin##*/}" >/dev/null; then
-        log "${lockbin##*/} already running"
-    else
-        run setsid -f sh -c 'exec "$@" </dev/null >/dev/null 2>&1' _ sh -c "$lockcmd"
+    # 1. lock now if this is the instance that locks (Budgie's) - the system
+    #    is about to suspend without a lock screen
+    if [ -n "$lockcmd" ]; then
+        lockbin=${lockcmd%% *}
+        if pgrep -u "$(id -u)" -x "${lockbin##*/}" >/dev/null; then
+            log "${lockbin##*/} already running"
+        else
+            run setsid -f sh -c 'exec "$@" </dev/null >/dev/null 2>&1' _ sh -c "$lockcmd"
+        fi
     fi
 
-    # 2. restart swayidle with the same arguments
+    # 2. restart it. The resume-display-on loop respawns its own listener, so
+    #    that one is only killed; anything else is started again with the same
+    #    arguments.
     run kill "$pid"
+    case "$parent" in
+        *resume-display-on-listener*) log "killed; resume-display-on respawns it"; return ;;
+    esac
     for ((i = 0; i < 20; i++)); do
         [ "$DRYRUN" = 1 ] || kill -0 "$pid" 2>/dev/null || break
         sleep 0.1
