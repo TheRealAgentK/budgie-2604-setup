@@ -1,0 +1,33 @@
+From a959e59c64b55dd17a974dda4c4b71dff520af3a Mon Sep 17 00:00:00 2001
+From: Brian Farris <briandavidfarris@gmail.com>
+Date: Sat, 22 Aug 2026 06:38:05 -0700
+Subject: [PATCH] Drain the sd-bus queue in the check pass
+
+sd-bus queues messages internally, and a synchronous sd_bus_call_method()
+queues every unrelated message it reads while waiting for its own reply.
+The fd is not readable while messages sit in that queue, so poll() never
+wakes the event loop, and a Session.Lock signal received during the
+SetIdleHint call is not dispatched until later bus traffic arrives.
+
+Drain the queue in the wl_event_source_check() pass, as display_event()
+already does for the Wayland display.
+
+Fixes: https://github.com/swaywm/swayidle/issues/204
+---
+ main.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/main.c b/main.c
+index c6bdab6f..cd5375b4 100644
+--- a/main.c
++++ b/main.c
+@@ -412,6 +412,9 @@ static int dbus_event(int fd, uint32_t mask, void *data) {
+ 		sd_bus_flush(bus);
+ 	}
+ 	if (mask == 0) {
++		while ((count = sd_bus_process(bus, NULL)) > 0) {
++			// Keep going until the queue is empty.
++		}
+ 		sd_bus_flush(bus);
+ 	}
+ 
