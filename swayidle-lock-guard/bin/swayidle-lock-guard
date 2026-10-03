@@ -37,17 +37,34 @@ log() {
 }
 
 run() {
-    if [ "$DRYRUN" = 1 ]; then log "would run: $*"; else "$@" 9>&-; fi
+    if [ "$DRYRUN" = 1 ]; then
+        local -a shown=("$@")
+        if [ "${shown[0]}" = env ]; then   # don't print the whole environment
+            shown=("${shown[@]:1}"); [ "${shown[0]}" = -i ] && shown=("${shown[@]:1}")
+            while [[ ${shown[0]} == *=* ]]; do shown=("${shown[@]:1}"); done
+            shown=("env -i <budgie-daemon env>" "${shown[@]}")
+        fi
+        log "would run: ${shown[*]}"
+    else
+        "$@" 9>&-
+    fi
 }
 
 recover() {
-    local pid=$1 i lockcmd="" lockbin parent
-    local -a argv
+    local pid=$1 i lockcmd="" lockbin parent src
+    local -a argv envv
 
     [ -r "/proc/$pid/cmdline" ] || { log "swayidle $pid already gone"; return; }
     [ "$(stat -c %u "/proc/$pid")" = "$(id -u)" ] || return
     mapfile -d '' argv < "/proc/$pid/cmdline"
     [ "${argv[0]##*/}" = swayidle ] || return
+    # The relaunch uses budgie-daemon's environment (it is what normally starts
+    # Budgie's swayidle), falling back to the old process's own. Never the caller's:
+    # a terminal's PATH (e.g. miniconda's dbus-send first) breaks the commands
+    # swayidle runs.
+    src=$(pgrep -u "$(id -u)" -x budgie-daemon | head -1)
+    mapfile -d '' envv < "/proc/${src:-$pid}/environ" 2>/dev/null \
+        || mapfile -d '' envv < "/proc/$pid/environ"
     for ((i = 1; i < ${#argv[@]}; i++)); do
         [ "${argv[i]}" = before-sleep ] && lockcmd=${argv[i + 1]-}
     done
@@ -62,7 +79,7 @@ recover() {
         if pgrep -u "$(id -u)" -x "${lockbin##*/}" >/dev/null; then
             log "${lockbin##*/} already running"
         else
-            run setsid -f sh -c 'exec "$@" </dev/null >/dev/null 2>&1' _ sh -c "$lockcmd"
+            run env -i "${envv[@]}" setsid -f sh -c 'exec "$@" </dev/null >/dev/null 2>&1' _ sh -c "$lockcmd"
         fi
     fi
 
@@ -77,7 +94,7 @@ recover() {
         [ "$DRYRUN" = 1 ] || kill -0 "$pid" 2>/dev/null || break
         sleep 0.1
     done
-    run setsid -f sh -c 'exec "$@" </dev/null 2>&1 | systemd-cat -t budgie-swayidle' _ "${argv[@]}"
+    run env -i "${envv[@]}" setsid -f sh -c 'exec "$@" </dev/null 2>&1 | systemd-cat -t budgie-swayidle' _ "${argv[@]}"
     log "swayidle restarted"
 }
 
