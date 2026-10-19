@@ -117,7 +117,7 @@ this machine:
 Type=Application
 Name=Keyboard Layout Indicator
 Comment=Show current keyboard layout in the Budgie panel
-Exec=/home/kai/.local/bin/keyboard-layout-indicator
+Exec=/home/<user>/.local/bin/keyboard-layout-indicator
 Terminal=false
 X-GNOME-Autostart-enabled=true
 ```

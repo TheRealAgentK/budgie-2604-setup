@@ -12,7 +12,7 @@ from this repo is a documented, manual, opt-in step. Verified read-only on
 | `/usr/local/bin/nvidia-detector` | `nvidia-detector-shim/nvidia-detector` | exec shell script (`root:root 0755`) | **current** — byte-identical, SHA-256 `1e542017…e106` |
 | `/etc/polkit-1/rules.d/10-enable-hibernate.rules` | `hibernate-polkit/10-enable-hibernate.rules` | PolicyKit JS rule (`root:root 0644`) | **current** (content from handoff; live file root-only, not byte-verified this session; `CanHibernate` → `yes`) |
 | `/etc/sysctl.d/60-inotify.conf` | `inotify-watches/60-inotify.conf` | sysctl drop-in (`root:root 0644`) | **current** — byte-identical; running value `1000000` |
-| `~/.config/autostart/Nextcloud.desktop` | `nextcloud-xcb-wayland/reference/Nextcloud.desktop` | XDG autostart entry (`kai:kai 0664`) | **current** — verbatim reference copy |
+| `~/.config/autostart/Nextcloud.desktop` | `nextcloud-xcb-wayland/reference/Nextcloud.desktop` | XDG autostart entry (`<user>:<user> 0664`) | **current** — verbatim reference copy |
 | Nextcloud XCB workaround (inline `env` in the `Exec=` above) | `nextcloud-xcb-wayland/scripts/nextcloud-xcb` | exec shell wrapper | repo representation only — **not installed** on the live machine |
 | labwc autostart (`~/.config/budgie-desktop/labwc/autostart`) + `~/.config/kanshi/config` | `display-scaling/` | config + scripts | **current** — see that component |
 | labwc autostart (`~/.config/budgie-desktop/labwc/autostart`) — `resume-display-on` block + `~/.local/bin/resume-display-on-listener` | `resume-display-on/` | managed autostart block + respawn-loop script | **current** — installed 2026-09-13; respawn loop added 2026-09-27; `hash -r` added 2026-10-01 |

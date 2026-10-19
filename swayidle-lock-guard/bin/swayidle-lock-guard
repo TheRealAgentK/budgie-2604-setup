@@ -8,7 +8,7 @@
 # after that waits the full 30 s InhibitDelayMaxSec and then goes ahead
 # WITHOUT locking the screen, and logind logs:
 #
-#   Delay lock is active (UID 1000/kai, PID 4740/swayidle) but inhibitor timeout is reached.
+#   Delay lock is active (UID 1000/<user>, PID 4740/swayidle) but inhibitor timeout is reached.
 #
 # The root cause is fixed by swayidle-dbus-fix; this is the safety net.
 #

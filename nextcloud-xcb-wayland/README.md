@@ -31,7 +31,7 @@ QT_QPA_PLATFORM=xcb /opt/Nextcloud-34.0.1-x86_64.AppImage
 | | |
 |---|---|
 | AppImage | `/opt/Nextcloud-34.0.1-x86_64.AppImage` (`root:root`, `0755`, ~64 MiB) |
-| Autostart | `~/.config/autostart/Nextcloud.desktop` (`kai:kai`, `0664`) |
+| Autostart | `~/.config/autostart/Nextcloud.desktop` (`<user>:<user>`, `0664`) |
 | Autostart `Exec=` | `env QT_QPA_PLATFORM=xcb "/opt/Nextcloud-34.0.1-x86_64.AppImage" --background` |
 | `startbudgielabwc` | sets `QT_QPA_PLATFORM=wayland` when unset (lines 75-77) |
 

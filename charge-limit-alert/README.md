@@ -21,9 +21,8 @@ to hold the battery below a full charge. On this board (`PHxARX1_PHxAQF1`, BIOS
   `0x07B9` (that's where the Gen10 charge-threshold patch expects it), and BIOS
   setup has no FlexiCharger.
 
-Raw logs, plots and the write-up for
-[tuxedo-control-center#268](https://github.com/tuxedocomputers/tuxedo-control-center/issues/268)
-are in `~/code/kai/tuxedo-charge-test/`.
+Upstream discussion of the stationary profile:
+[tuxedo-control-center#268](https://github.com/tuxedocomputers/tuxedo-control-center/issues/268).
 
 So software can't limit charging on this machine. It can only tell you when to
 unplug, or switch off a plug it controls.

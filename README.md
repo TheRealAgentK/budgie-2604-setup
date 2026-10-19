@@ -1,22 +1,48 @@
 # budgie-2604-setup
 
-Fixes and tweaks for a fresh **Ubuntu Budgie 26.04** install on a
-**TUXEDO InfinityBook Pro Gen7 MK1**.
+Fixes for problems on a fresh **Ubuntu Budgie 26.04** install, Wayland session
+(labwc), found and tested on a **TUXEDO InfinityBook Pro Gen7 MK1**.
+
+Each fix lives in its own directory, and its README explains the symptom, the
+cause, the evidence and the fix. If you're here from a search, look for your
+symptom in the table below and read that component's README before installing
+anything.
 
 ```
-Desktop:     Budgie          Session:  Wayland      Compositor: labwc
+Desktop:     Budgie 10.10.2  Session:  Wayland      Compositor: labwc 0.9.3
 Display mgr: SDDM            Display:  eDP-1  (2880x1800 native panel)
 Graphics:    NVIDIA RTX 3050 Ti + Intel Iris Xe hybrid (mate-optimus)
 Nemo:        6.4.5           Cursor theme: Breeze_Light
 ```
 
-## Components
+## Using it
 
-Each directory is self-contained: its own `README.md`, docs, and conservative
-scripts. Fixes that this repo actively manages ship an idempotent `install.sh`
-(`--check` to report only); pure captures of already-working system state ship a
-read-only `verify.sh` and document install steps without running them. See
-[`docs/manifest.md`](docs/manifest.md) for the full live-path ↔ repo-path map.
+- The components are independent, so install only the ones you need.
+- Components the repo manages come with `install.sh`, `install.sh --check` (a
+  report that changes nothing) and `uninstall.sh`. Re-running `install.sh`
+  changes nothing once installed.
+- Captures of system state that already works on this machine (polkit rule,
+  sysctl, shims) come with a read-only `verify.sh`, and their README documents
+  the install steps instead of running them.
+- Some values are specific to this machine: the display mode in
+  `display-scaling/`, the EN/DE layouts in `keyboard-layout-indicator/`, the
+  charge limit in `charge-limit-alert/`. Read before you install.
+- [`docs/manifest.md`](docs/manifest.md) maps every installed path to its repo
+  file.
+
+## Reported upstream
+
+Several of these are workarounds for bugs that have been reported. Once a fix
+ships, the workaround can go.
+
+| Workaround | Upstream report |
+|---|---|
+| `swayidle-dbus-fix/`, `swayidle-lock-guard/` | [swaywm/swayidle#211](https://github.com/swaywm/swayidle/issues/211): release request for the fix (`a959e59`), which is not in 1.9.0 |
+| `resume-display-on/` | [budgie-desktop#1032](https://github.com/BuddiesOfBudgie/budgie-desktop/issues/1032): no `after-resume` handler, so the screen stays black after the idle suspend |
+| `resume-display-on/` (respawn loop) | [budgie-desktop#1033](https://github.com/BuddiesOfBudgie/budgie-desktop/issues/1033): `budgie-daemon` runs `killall swayidle` |
+| `charge-limit-alert/` | [tuxedo-control-center#268](https://github.com/tuxedocomputers/tuxedo-control-center/issues/268): the stationary charging profile has no effect on this board |
+
+## Components
 
 | Directory | What it does |
 |---|---|
@@ -32,8 +58,6 @@ read-only `verify.sh` and document install steps without running them. See
 | [`swayidle-dbus-fix/`](swayidle-dbus-fix/) | **Root-cause fix** for 30-second suspends that wake with no lock screen. `swayidle` 1.9.0 can strand logind's `PrepareForSleep` in sd-bus's queue and then handle every sleep signal one event late. Builds 1.9.0 plus upstream fix `a959e59` into `~/.local/bin/swayidle`, which comes first on the session's PATH. The package isn't touched. |
 | [`swayidle-lock-guard/`](swayidle-lock-guard/) | Safety net for `swayidle-dbus-fix`: restores the **lock screen and fast suspend** when a `swayidle` stops handling suspend. Each suspend then waited 30 s for its stale inhibitor and woke unlocked. It watches logind's journal for that inhibitor timeout, locks the screen if that instance is the one that locks, and restarts it. Marked labwc autostart block. |
 | [`charge-limit-alert/`](charge-limit-alert/) | Warns to **unplug at 80 %**, because this board's EC ignores TCC's stationary charging profile and always charges to 100 %. `charge-guard` user service with desktop notifications and optional smart-plug cutoff hooks. |
-
-They are independent; install any subset.
 
 ## Conventions
 
@@ -53,10 +77,10 @@ They are independent; install any subset.
 - Package-owned files are not edited in place — `dpkg-divert` and
   `slicksddm-customize` are used instead.
 
-## Removed experiments — do NOT reintroduce
+## What didn't work
 
-These were tried while debugging and deliberately abandoned. Do not let any
-script or future change recreate them.
+These were tried while debugging and dropped. They're listed so you don't spend
+time on them, and so no script here recreates them.
 
 **Nemo forced onto XWayland** — `GDK_BACKEND=x11` for Nemo. Restored the resize
 cursor but broke drag-and-drop from Nemo into native-Wayland Brave. Includes:

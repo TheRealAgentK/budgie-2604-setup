@@ -23,7 +23,7 @@ the inhibitor. From then on, every suspend:
 and logind logs:
 
 ```
-Delay lock is active (UID 1000/kai, PID 4740/swayidle) but inhibitor timeout is reached.
+Delay lock is active (UID 1000/<user>, PID 4740/swayidle) but inhibitor timeout is reached.
 ```
 
 It stays like this until that `swayidle` is restarted. `budgie-daemon` does not
@@ -89,8 +89,9 @@ with is gone.
 
 The labwc `autostart` is edited only inside the
 `# >>> budgie-2604-setup:swayidle-lock-guard >>>` block, with a
-`.bak-<timestamp>` backup. Requires read access to the system journal (`kai` is
-in `adm`); `install.sh` checks this.
+`.bak-<timestamp>` backup. Requires read access to the system journal (membership of `adm`
+or `systemd-journal`; the first user on Ubuntu is in `adm`); `install.sh`
+checks this.
 
 ## Verify
 
@@ -104,7 +105,7 @@ Dry-run test without touching anything:
 
 ```
 for P in $(pgrep -x swayidle); do
-  echo "Delay lock is active (UID 1000/kai, PID $P/swayidle) but inhibitor timeout is reached."
+  echo "Delay lock is active (UID $(id -u)/$(id -un), PID $P/swayidle) but inhibitor timeout is reached."
 done | SWAYIDLE_LOCK_GUARD_DRYRUN=1 ./bin/swayidle-lock-guard --stdin
 ```
 
