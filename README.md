@@ -25,8 +25,8 @@ Nemo:        6.4.5           Cursor theme: Breeze_Light
   sysctl, shims) come with a read-only `verify.sh`, and their README documents
   the install steps instead of running them.
 - Some values are specific to this machine: the display mode in
-  `display-scaling/`, the EN/DE layouts in `keyboard-layout-indicator/`, the
-  charge limit in `charge-limit-alert/`. Read before you install.
+  `display-scaling/` and the EN/DE layouts in `keyboard-layout-indicator/`.
+  Read before you install.
 - [`docs/manifest.md`](docs/manifest.md) maps every installed path to its repo
   file.
 
@@ -40,7 +40,6 @@ ships, the workaround can go.
 | `swayidle-dbus-fix/`, `swayidle-lock-guard/` | [swaywm/swayidle#211](https://github.com/swaywm/swayidle/issues/211): release request for the fix (`a959e59`), which is not in 1.9.0 |
 | `resume-display-on/` | [budgie-desktop#1032](https://github.com/BuddiesOfBudgie/budgie-desktop/issues/1032): no `after-resume` handler, so the screen stays black after the idle suspend |
 | `resume-display-on/` (respawn loop) | [budgie-desktop#1033](https://github.com/BuddiesOfBudgie/budgie-desktop/issues/1033): `budgie-daemon` runs `killall swayidle` |
-| `charge-limit-alert/` | [tuxedo-control-center#268](https://github.com/tuxedocomputers/tuxedo-control-center/issues/268): the stationary charging profile has no effect on this board |
 
 ## Components
 
@@ -57,7 +56,6 @@ ships, the workaround can go.
 | [`resume-display-on/`](resume-display-on/) | Turns the panel back on after **suspend/resume**. Budgie's idle `swayidle` switches outputs off at 5 min and only re-enables them on idle activity, so waking from the battery idle-suspend left a black screen. Adds an `after-resume` listener, respawned after `budgie-daemon`'s `killall swayidle`, via a marked labwc autostart block. |
 | [`swayidle-dbus-fix/`](swayidle-dbus-fix/) | **Root-cause fix** for 30-second suspends that wake with no lock screen. `swayidle` 1.9.0 can strand logind's `PrepareForSleep` in sd-bus's queue and then handle every sleep signal one event late. Builds 1.9.0 plus upstream fix `a959e59` into `~/.local/bin/swayidle`, which comes first on the session's PATH. The package isn't touched. |
 | [`swayidle-lock-guard/`](swayidle-lock-guard/) | Safety net for `swayidle-dbus-fix`: restores the **lock screen and fast suspend** when a `swayidle` stops handling suspend. Each suspend then waited 30 s for its stale inhibitor and woke unlocked. It watches logind's journal for that inhibitor timeout, locks the screen if that instance is the one that locks, and restarts it. Marked labwc autostart block. |
-| [`charge-limit-alert/`](charge-limit-alert/) | Warns to **unplug at 80 %**, because this board's EC ignores TCC's stationary charging profile and always charges to 100 %. `charge-guard` user service with desktop notifications and optional smart-plug cutoff hooks. |
 
 ## Conventions
 
@@ -103,6 +101,12 @@ theme scale `1.25`.
 **Fractional-scaling resume hacks** — `~/.local/bin/fix-budgie-scale` and any
 `wlr-randr --output eDP-1 --scale 1.2` workaround. Replaced by
 `2304x1440 @ scale 1.0` reasserted by kanshi.
+
+## Related
+
+Battery charging on this laptop (does TCC's Stationary profile limit
+charging?) has its own repo with raw logs and scripts:
+[tuxedo-ibp-gen7-charge-profile](https://github.com/TheRealAgentK/tuxedo-ibp-gen7-charge-profile).
 
 ## License
 
